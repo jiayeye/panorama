@@ -17,8 +17,18 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader";
+import { OutlineEffect } from "three/examples/jsm/effects/OutlineEffect";
 
-let camera, scene, renderer, controls, tickId, scale;
+let camera,
+  scene,
+  scene_selectObjects,
+  renderer,
+  controls,
+  tickId,
+  scale,
+  objects,
+  effect,
+  raycaster;
 
 export default {
   props: {
@@ -40,6 +50,7 @@ export default {
   methods: {
     initScene(modelUrl) {
       scale = 1;
+      objects = [];
       // reset
       this.destroy();
 
@@ -53,23 +64,37 @@ export default {
         30,
         cameraMaxDistance
       );
-      
+
       camera.position.set(0, 0, 100);
 
       // 添加场景及颜色
       scene = new THREE.Scene();
-      scene.background = new THREE.Color(0xffffff);
+      // scene.background = new THREE.Color(0xffffff);
+
+      scene_selectObjects = new THREE.Scene();
+      // scene_selectObjects.background = new THREE.Color(0xffffff);
 
       // 添加光源
-      const hemiLight = new THREE.HemisphereLight(0xffffff, 0x000000);
+      const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444);
       hemiLight.position.set(0, 2000, 0);
+      hemiLight.intensity = 0.8;
       scene.add(hemiLight);
+      const hemiLight1 = new THREE.HemisphereLight(0xffffff, 0x444444);
+      hemiLight1.position.set(0, 2000, 0);
+      hemiLight1.intensity = 0.8;
+      scene_selectObjects.add(hemiLight1);
 
       // 设置直射光
       const dirLight = new THREE.DirectionalLight(0xdddddd);
       dirLight.castShadow = false;
-      dirLight.intensity = 0.6;
+      dirLight.intensity = 0.2;
+      dirLight.position.set(0, 1000, 1000);
       scene.add(dirLight);
+      const dirLight1 = new THREE.DirectionalLight(0xdddddd);
+      dirLight1.castShadow = false;
+      dirLight1.intensity = 0.2;
+      dirLight1.position.set(0, 1000, 1000);
+      scene_selectObjects.add(dirLight1);
 
       // 添加WebGLRenderer，设置size
       renderer = new THREE.WebGLRenderer({
@@ -92,55 +117,61 @@ export default {
       const loader = new FBXLoader(manager);
       // 除湿机
       loader.load(
-        'https://syn-yf-design-tool.oss-cn-beijing.aliyuncs.com/save_fbx/AJ0261M07-模型.fbx',
+        "https://syn-yf-design-tool.oss-cn-beijing.aliyuncs.com/save_fbx/AJ0261M07-模型.fbx",
         (object) => {
           object.traverse((child) => {
             if (child.isMesh) {
               child.castShadow = false;
               child.receiveShadow = false;
             }
+            child.userData.parent = object;
           });
           // 设置object position
-          object.position.set(0, -900, -2000);
+          object.position.set(-650, -600, -2200);
 
           // 添加object到场景里
           scene.add(object);
+          objects.push(object);
         }
       );
 
       // 体脂秤
       loader.load(
-        'https://syn-yf-design-tool.oss-cn-beijing.aliyuncs.com/save_fbx/JM03F400Y-模型.fbx',
+        "https://syn-yf-design-tool.oss-cn-beijing.aliyuncs.com/save_fbx/JM03F400Y-模型.fbx",
         (object) => {
           object.traverse((child) => {
             if (child.isMesh) {
               child.castShadow = false;
               child.receiveShadow = false;
             }
+            child.userData.parent = object;
           });
           // 设置object position
           object.position.set(700, -930, -2300);
 
           // 添加object到场景里
           scene.add(object);
+          objects.push(object);
         }
       );
 
-        // 电视
-        loader.load(
-        'https://syn-yf-design-tool.oss-cn-beijing.aliyuncs.com/save_fbx/DH1UN0A02-模型1.fbx',
+      // 电视
+      loader.load(
+        "https://syn-yf-design-tool.oss-cn-beijing.aliyuncs.com/save_fbx/DH1UN0A02-模型1.fbx",
         (object) => {
           object.traverse((child) => {
             if (child.isMesh) {
               child.castShadow = false;
               child.receiveShadow = false;
             }
+            child.userData.parent = object;
           });
           // 设置object position
           object.position.set(1760, 95, -1790);
 
           // 添加object到场景里
           scene.add(object);
+          objects.push(object);
         }
       );
 
@@ -151,12 +182,24 @@ export default {
       // pz = front
       // nz = back
       const textures = [];
-      const px = new THREE.TextureLoader().load("https://syn-yf-design-tool.oss-cn-beijing.aliyuncs.com/panorama/px.jpg");
-      const nx = new THREE.TextureLoader().load("https://syn-yf-design-tool.oss-cn-beijing.aliyuncs.com/panorama/nx.jpg");
-      const py = new THREE.TextureLoader().load("https://syn-yf-design-tool.oss-cn-beijing.aliyuncs.com/panorama/py.jpg");
-      const ny = new THREE.TextureLoader().load("https://syn-yf-design-tool.oss-cn-beijing.aliyuncs.com/panorama/ny.jpg");
-      const pz = new THREE.TextureLoader().load("https://syn-yf-design-tool.oss-cn-beijing.aliyuncs.com/panorama/pz.jpg");
-      const nz = new THREE.TextureLoader().load("https://syn-yf-design-tool.oss-cn-beijing.aliyuncs.com/panorama/nz.jpg");
+      const px = new THREE.TextureLoader().load(
+        "https://syn-yf-design-tool.oss-cn-beijing.aliyuncs.com/panorama/px.jpg"
+      );
+      const nx = new THREE.TextureLoader().load(
+        "https://syn-yf-design-tool.oss-cn-beijing.aliyuncs.com/panorama/nx.jpg"
+      );
+      const py = new THREE.TextureLoader().load(
+        "https://syn-yf-design-tool.oss-cn-beijing.aliyuncs.com/panorama/py.jpg"
+      );
+      const ny = new THREE.TextureLoader().load(
+        "https://syn-yf-design-tool.oss-cn-beijing.aliyuncs.com/panorama/ny.jpg"
+      );
+      const pz = new THREE.TextureLoader().load(
+        "https://syn-yf-design-tool.oss-cn-beijing.aliyuncs.com/panorama/pz.jpg"
+      );
+      const nz = new THREE.TextureLoader().load(
+        "https://syn-yf-design-tool.oss-cn-beijing.aliyuncs.com/panorama/nz.jpg"
+      );
       textures.push(px);
       textures.push(nx);
       textures.push(py);
@@ -167,9 +210,20 @@ export default {
       for (let i = 0; i < 6; i++) {
         materials.push(new THREE.MeshBasicMaterial({ map: textures[i] }));
       }
-      const skyBox = new THREE.Mesh(new THREE.BoxGeometry(5000, 5000, 5000), materials);
+      const skyBox = new THREE.Mesh(
+        new THREE.BoxGeometry(5000, 5000, 5000),
+        materials
+      );
       skyBox.geometry.scale(1, 1, -1);
       scene.add(skyBox);
+
+      // 创建线框效果
+      effect = new OutlineEffect(renderer, {
+        defaultThickness: 0.003,
+        defaultColor: [0, 0, 1],
+      });
+
+      raycaster = new THREE.Raycaster();
 
       // 监听窗口reszie事件
       window.addEventListener("resize", this.onWindowResize);
@@ -177,6 +231,8 @@ export default {
       window.addEventListener("mousedown", this.onMouseDown);
       // 设置tick
       this.animate();
+
+      document.addEventListener("click", this.onClick);
     },
 
     // 加载进度
@@ -209,15 +265,44 @@ export default {
       controls.autoRotate = false;
     },
 
+    // 点击事件
+    onClick(event) {
+      event.preventDefault();
+      const mouse = new THREE.Vector2();
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const intersections = raycaster.intersectObjects(objects, true);
+      if (intersections[0]) {
+        objects.forEach((obj) => {
+          scene.remove(obj);
+          scene_selectObjects.remove(obj);
+        });
+        objects.forEach((obj) => {
+          scene.add(obj);
+        });
+
+        scene.remove(intersections[0].object.userData.parent);
+        scene_selectObjects.add(intersections[0].object.userData.parent);
+      }
+    },
+
     // 每帧调用
     animate() {
+      // 清除背景色
+
       // 获取callback handler
       tickId = requestAnimationFrame(this.animate);
-
       // 更新control状态
       controls.update();
       // 每帧渲染
       renderer.render(scene, camera);
+      renderer.autoClear = false;
+      // 渲染描边物体
+      effect.autoClear = renderer.autoClear;
+      effect.render(scene_selectObjects, camera);
+      renderer.autoClear = true;
+      effect.autoClear = renderer.autoClear;
     },
     // 清空场景
     destroy() {
@@ -233,6 +318,7 @@ export default {
       }
       renderer = null;
       scene = null;
+      scene_selectObjects = null;
       camera = null;
       controls = null;
     },
